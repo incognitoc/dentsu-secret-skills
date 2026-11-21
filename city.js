@@ -30,7 +30,7 @@
     varying vec3 ink, world;
     varying vec4 edges;
     varying float depth, surface;
-    const vec3 sumi = vec3(.095,.128,.154);
+    const vec3 sumi = vec3(.049,.058,.064);
     const vec3 paper = vec3(.91,.80,.62);
     float hash(vec2 p) {
       p=fract(p*vec2(.1031,.11369));
@@ -71,7 +71,7 @@
         float stone=hash(floor(slab));
         color=mix(vec3(.42,.46,.46),ink,.27+.46*stone);
         color=mix(color,paper,.16*wash+.09*grain);
-        color=mix(color,sumi,max(ruling(slab.x,.012),ruling(slab.y,.013))*detail*(.16+.22*wash));
+        color=mix(color,sumi,max(ruling(slab.x,.012),ruling(slab.y,.013))*detail*(.22+.24*wash));
       }
       // Broken pigment and paper tooth across the same printed sheet as the skyline.
       color=mix(color,paper,.16*smoothstep(.27,.76,wash)+.06*grain);
@@ -81,7 +81,7 @@
       color=mix(color,paper,smoothstep(.59,.82,tooth)*.21);
       float dist=min(min(edges.x,edges.y),min(edges.z,edges.w));
       float stroke=clamp(depth*.00095,.016,.065)*(.78+.46*wash);
-      color=mix(color,sumi,(1.-smoothstep(stroke*.44,stroke*1.65,dist))*(.36+.34*detail));
+      color=mix(color,sumi,(1.-smoothstep(stroke*.44,stroke*1.65,dist))*(.43+.35*detail));
       color+=detail*(grain-.5)*.052;
       float fog=smoothstep(15.,137.,depth);
       gl_FragColor=vec4(mix(color,vec3(.59,.56,.52),fog*.78),1.);
@@ -107,7 +107,7 @@
     const material=materials.get(color)||0;
     for(const i of [0,1,2,0,2,3]) mesh.push(...points[i],...rgb,...edges[i],material);
   }
-  const timber='#855b40', beam='#aa6845', tile='#40617b', edge='#263e50', plaster='#dbbe93';
+  const timber='#855b40', beam='#aa6845', tile='#40617b', edge='#202c34', plaster='#dbbe93';
   const materials=new Map([[tile,1],['#63849a',1],['#536e80',1],[timber,2],[beam,2],['#bfa381',3]]);
   const baseRoof=[tile,'#63849a','#536e80'];
   const roofColors=[baseRoof,['#535f67','#76828a','#65747c'],['#445d60','#66817f','#586e71'],
