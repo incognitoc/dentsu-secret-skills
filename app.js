@@ -211,7 +211,7 @@ function render() {
   position = Math.max(0,matches.indexOf(previous));
   alignBookProjection();
   drawRing();
-  document.querySelector('#count').textContent = matches.length + ' / ' + books.length + ' 冊';
+  document.querySelector('#docked-count').textContent = document.querySelector('#count').textContent = matches.length + ' / ' + books.length + ' 冊';
 }
 reset.onclick = () => { selected.clear(); render(); };
 render();
