@@ -65,18 +65,26 @@
         color=mix(color,paper,ruling(grainLine-.2,.024)*detail*.23);
       } else if(surface>2.5 && surface<3.5) {
         // Staggered paving blocks, cut into the same ochre colour plate.
-        float row=world.z*.94;
-        vec2 slab=vec2(world.x*.54+.5*mod(floor(row),2.),row)+.014*wash;
-        color=mix(ink,paper,.18*hash(floor(slab)));
-        color=mix(color,sumi,max(ruling(slab.x,.012),ruling(slab.y,.013))*detail*.7);
+        float row=world.z*.91 + .042*(noise(world.xz*1.3)-.5);
+        vec2 slab=vec2(world.x*.57+.43*hash(vec2(floor(row),3.)),row);
+        slab.x+=.035*(noise(world.xz*2.)-.5);
+        float stone=hash(floor(slab));
+        color=mix(vec3(.42,.46,.46),ink,.27+.46*stone);
+        color=mix(color,paper,.16*wash+.09*grain);
+        color=mix(color,sumi,max(ruling(slab.x,.012),ruling(slab.y,.013))*detail*(.16+.22*wash));
       }
-      color=mix(color,paper,.13*step(.48,wash)+.065*grain);
+      // Broken pigment and paper tooth across the same printed sheet as the skyline.
+      color=mix(color,paper,.16*smoothstep(.27,.76,wash)+.06*grain);
+      vec2 sheet=gl_FragCoord.xy;
+      float tooth=.54*noise(sheet*.53)+.31*noise(sheet*vec2(.17,.34))+.15*noise(sheet*.069);
+      color+=(tooth-.5)*vec3(.22,.197,.16);
+      color=mix(color,paper,smoothstep(.59,.82,tooth)*.21);
       float dist=min(min(edges.x,edges.y),min(edges.z,edges.w));
       float stroke=clamp(depth*.00095,.016,.065)*(.78+.46*wash);
-      color=mix(color,sumi,(1.-smoothstep(stroke*.44,stroke*1.65,dist))*(.48+.39*detail));
+      color=mix(color,sumi,(1.-smoothstep(stroke*.44,stroke*1.65,dist))*(.36+.34*detail));
       color+=detail*(grain-.5)*.052;
       float fog=smoothstep(15.,137.,depth);
-      gl_FragColor=vec4(mix(color,vec3(.43,.49,.52),fog*.77),1.);
+      gl_FragColor=vec4(mix(color,vec3(.59,.56,.52),fog*.78),1.);
     }`;
   function shader(type, source) {
     const part = gl.createShader(type);
@@ -181,9 +189,6 @@
   }
   block(-85,-.31,-55,170,.22,305,'#927e67');
   block(-4.6,-.09,-55,9.2,.07,305,'#bfa381');
-  for(let z=-45;z<226;z+=2.2){
-    face([-4.6,0,z],[4.6,0,z],[4.6,0,z+.028],[-4.6,0,z+.028],'#7c7163');
-  }
   for(let i=0;i<38;i++){
     const z=i*7.1-32;
     shop(-1,z,i);shop(1,z+1.65,i+2);
