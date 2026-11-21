@@ -183,3 +183,5 @@ header {position:relative;z-index:8}
 .fallback-glyph{font-family:"Microsoft JhengHei","微軟正黑體","PingFang TC","Noto Sans CJK TC",sans-serif}
 
 @media(max-width:620px){#filter-toggle strong{position:static;transform:none;margin-right:auto;white-space:nowrap}}
+
+.city.rendering .skyline{visibility:hidden}

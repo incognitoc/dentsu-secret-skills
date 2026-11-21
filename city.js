@@ -20,7 +20,8 @@
       p.xz=vec2(p.x*heading.y-p.z*heading.x,p.x*heading.x+p.z*heading.y);
       float d = p.z * ${cityCamera.cosPitch} - p.y * ${cityCamera.sinPitch};
       float h = p.y * ${cityCamera.cosPitch} + p.z * ${cityCamera.sinPitch};
-      gl_Position = vec4(p.x*${cityCamera.lens}/aspect,h*${cityCamera.lens},d*1.00143-0.20014,d);
+      gl_Position = vec4(p.x*${cityCamera.lens}/aspect,h*${cityCamera.lens},d*1.00016-0.20002,d);
+      if(material>4.5)gl_Position.z=.999999*gl_Position.w;
       depth=d; ink=pigment; world=point; edges=faceEdges; surface=material;
     }`;
   const fragment = `
@@ -50,6 +51,18 @@
       return 1.-smoothstep(thickness,thickness+.04,abs(fract(t+.5)-.5));
     }
     void main() {
+      if(surface>3.5){
+        float tooth=texture2D(printPlate,world.xy*.036).g-.5;
+        if(surface>4.5){
+          float height=smoothstep(-22.,265.,world.y);
+          vec3 dusk=mix(vec3(.89,.66,.49),vec3(.145,.29,.40),height);
+          float moon=1.-smoothstep(18.,19.,distance(world.xy,vec2(340.,168.)));
+          gl_FragColor=vec4(mix(dusk,vec3(1.,.79,.49),moon)+tooth*.12,1.);
+        }else{
+          gl_FragColor=vec4(ink+tooth*.11,1.);
+        }
+        return;
+      }
       vec2 xy=world.xz+world.y*vec2(.31,.64);
       float detail=1.-smoothstep(12.,58.,depth);
       float grain=noise(xy*vec2(14.,24.));
@@ -225,6 +238,52 @@
     }
   }
   lot=null;
+
+  // The entire valley is projected by the street camera, including the skyline.
+  const skyInk='#506b80';
+  materials.set(skyInk,5);
+  for(let i=0;i<64;i++){
+    const a=i*Math.PI/32,b=(i+1)*Math.PI/32;
+    const x=850*Math.sin(a),z=850*Math.cos(a),xx=850*Math.sin(b),zz=850*Math.cos(b);
+    face([x,-1800,z],[xx,-1800,zz],[xx,1800,zz],[x,1800,z],skyInk);
+  }
+  for(const [distance,base,amplitude,pigment] of [
+    [580,47,22,'#748286'],[465,21,15,'#606f71'],[350,-4,11,'#526561']
+  ]){
+    materials.set(pigment,4);
+    const ridge=x=>base+amplitude*(.68*Math.sin(x*.014+distance)+.29*Math.sin(x*.044)+.12*Math.cos(x*.089));
+    for(let x=-1900;x<1900;x+=8){
+      face([x,-220,distance],[x+8,-220,distance],[x+8,ridge(x+8),distance],[x,ridge(x),distance],pigment);
+    }
+  }
+  face([-1500,-64,-100],[1500,-64,-100],[1500,-64,700],[-1500,-64,700],'#928770');
+  for(let t=-60;t<250;t+=5){
+    const y=elevation(t)-2.3,nextY=elevation(t+5)-2.3;
+    face([-340,y,t],[340,y,t],[340,nextY,t+5],[-340,nextY,t+5],'#928770');
+  }
+  for(let row=0;row<6;row++){
+    for(let n=-15;n<=15;n++){
+      const x=n*9+3*Math.sin(row+n),t=50+row*28+4*Math.cos(n*3+row);
+      if(Math.abs(x-centerX(t))<18)continue;
+      const floor=elevation(t)-1.2,h=3.5+.8*Math.sin(n*row+2);
+      block(x-3,floor-4,t-3,6,h+4,6,wallColors[Math.abs(n+row)%wallColors.length]);
+      roof(x,t,7.3,8,floor+h,2.1);
+    }
+  }
+  // Landmarks sit on terraces, so they keep their place as the camera turns.
+  const towerX=-35,towerZ=78,base=elevation(towerZ)+4;
+  block(towerX-5,base-10,towerZ-5,10,10,10,'#81776a');
+  for(let k=0;k<5;k++){
+    const width=11-k*1.5,y=base+k*3.8;
+    block(towerX-width*.32,y,towerZ-width*.32,width*.64,2.8,width*.64,timber);
+    roof(towerX,towerZ,width,width,y+2.7,1.9);
+  }
+  block(towerX-.12,base+20,towerZ-.12,.24,3.2,.24,edge);
+  const templeY=elevation(82)+9;
+  for(const x of [28,34,40])for(const t of [77,83,89])block(x,templeY-16,t,.7,16,.7,timber);
+  block(26,templeY-1,75,17,1.2,16,beam);
+  block(28,templeY,77,13,4.3,12,plaster);
+  roof(34.5,83,17,19,templeY+4.2,3.8);
 
   let program, eye, aspect, heading;
   function setup() {
