@@ -31,9 +31,7 @@ body::before {display:none}
 .city::after {content:"";position:absolute;inset:0;background:linear-gradient(180deg,#101c222b,#1421242b 25%,#11202275 53%,#101a1bd6 100%)}
 @keyframes fly {from{transform:translateZ(0)}to{transform:translate3d(-.65%,-.65%,72px)}}
 @keyframes near-flight {to{transform:translate3d(.5%,1%,22px)}}
-.runner {position:absolute;left:17%;top:64%;width:25px;height:32px;background:#161f20;opacity:0;clip-path:polygon(42% 8%,50% 4%,61% 8%,63% 17%,56% 23%,62% 32%,83% 26%,99% 18%,97% 28%,79% 40%,63% 45%,55% 57%,78% 59%,87% 92%,78% 94%,68% 70%,45% 72%,39% 61%,24% 77%,3% 76%,0 68%,20% 65%,31% 48%,40% 34%,20% 41%,8% 30%,13% 25%,24% 32%,39% 22%,44% 20%);animation:leap 21s linear infinite}
-@keyframes leap {0%,72%,83%,100%{opacity:0}73%{opacity:.95;transform:translate(0,0) rotate(10deg)}76%{opacity:1;transform:translate(3vw,-3.5vh) rotate(-8deg)}79%{opacity:1;transform:translate(6vw,0) rotate(12deg)}81%{opacity:.9;transform:translate(8vw,-2vh) rotate(-10deg)}83%{transform:translate(10vw,0)}}
-.paused :is(.flight,.roofs,.runner){animation-play-state:paused}.paused .runner{visibility:hidden}
+.paused :is(.flight,.roofs){animation-play-state:paused}
 header {background:#172a2bdd;border-bottom:1px solid #d4be865e}.bar{min-height:50px}nav{align-items:center}#motion{color:#ecdfc6;border:0;padding:4px;font-size:.82rem}
 main {width:min(1250px,96%)}.hero {justify-content:center;text-align:center;min-height:0;border:0;overflow:visible;color:#ffefd3;background:none}
 .hero-copy {width:100%;padding:clamp(26px,5vh,64px) 1rem 20px;text-shadow:0 2px 10px #080d0c,0 1px 3px #090909}
@@ -84,7 +82,7 @@ footer{color:#e6dfd0;text-align:center;text-shadow:0 1px 3px #111}
 .book-back{inset:0 4px 3px 0;background:var(--cloth);border:1px solid #ad9979;transform:translateZ(-8px) rotateY(180deg);backface-visibility:hidden}
 .page-edge{right:4px;top:1px;bottom:4px;width:8px;transform-origin:right;transform:rotateY(-90deg);background:repeating-linear-gradient(90deg,#d3c3a5 0 1px,#ada088 1px 2px)}
 .jacket{backface-visibility:hidden}
-.runner{left:76%;top:67%}
+
 @media(min-width:981px){
   #groups {display:flex;flex-wrap:wrap;justify-content:center;gap:5px}
   .group,.options {display:contents}
@@ -94,7 +92,6 @@ footer{color:#e6dfd0;text-align:center;text-shadow:0 1px 3px #111}
 .hero h1 {font-weight:500;font-variation-settings:"wght" 500,"wdth" 150;text-wrap:balance}
 .hero h1 span {display:inline-block}
 #city-view {position:absolute;inset:0;width:100%;height:100%;display:block}
-.city.rendering .runner {animation:none;left:0;top:0;transform-origin:0 100%}
 #list{overflow:clip}
 #book-models{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 .models-ready .book > span{visibility:hidden}
@@ -184,4 +181,4 @@ header {position:relative;z-index:8}
 
 @media(max-width:620px){#filter-toggle strong{position:static;transform:none;margin-right:auto;white-space:nowrap}}
 
-.city.rendering .skyline{visibility:hidden}
+.skyline{transform-origin:50% 45%}

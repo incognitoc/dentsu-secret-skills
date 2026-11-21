@@ -1,4 +1,7 @@
-// Kyoto is a single static mesh. Its streets, eaves, screens and lanterns share one draw call.
+// Kyoto is a single static mesh drawn as a woodblock print: flat colour plates,
+// bokashi gradients, a sumi keyline round every face and a soft paper tooth.
+// Materials: 0 plain, 1 roof tile, 2 timber, 3 paving, 4 mountain, 5 sky,
+// 6 foliage, 7 lamplight, 8 hillside.
 (() => {
   const canvas = document.querySelector('#city-view');
   const gl = canvas.getContext('webgl', {alpha:true, antialias:true, premultipliedAlpha:false});
@@ -21,9 +24,11 @@
       float d = p.z * ${cityCamera.cosPitch} - p.y * ${cityCamera.sinPitch};
       float h = p.y * ${cityCamera.cosPitch} + p.z * ${cityCamera.sinPitch};
       gl_Position = vec4(p.x*${cityCamera.lens}/aspect,h*${cityCamera.lens},d*1.00016-0.20002,d);
-      if(material>4.5)gl_Position.z=.999999*gl_Position.w;
+      if(material>4.5&&material<5.5)gl_Position.z=.999999*gl_Position.w;
       depth=d; ink=pigment; world=point; edges=faceEdges; surface=material;
     }`;
+  // Surfaces are printed with swatches cut from the painted backdrop itself
+  // (see paintingAtlas below), so near geometry and the painting share one hand.
   const fragment = `
     #ifdef GL_FRAGMENT_PRECISION_HIGH
     precision highp float;
@@ -34,74 +39,54 @@
     varying vec4 edges;
     varying float depth, surface;
     uniform sampler2D printPlate;
-    const vec3 sumi = vec3(.049,.058,.064);
-    const vec3 paper = vec3(.91,.80,.62);
+    const vec3 sumi = vec3(.08,.075,.08);
     float hash(vec2 p) {
       p=fract(p*vec2(.1031,.11369));
       p+=dot(p,p.yx+19.19);
       return fract((p.x+p.y)*p.x);
     }
-    float noise(vec2 p) {
-      vec2 i=floor(p),f=fract(p);
-      f=f*f*(3.-2.*f);
-      return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),
-                 mix(hash(i+vec2(0,1)),hash(i+1.),f.x),f.y);
+    vec2 mirrored(vec2 u){return 1.-abs(1.-mod(u,2.));}
+    // The atlas is a 4x2 grid of swatches.
+    float noise(vec2 p){
+      vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
+      return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+1.),f.x),f.y);
     }
-    float ruling(float t,float thickness) {
-      return 1.-smoothstep(thickness,thickness+.04,abs(fract(t+.5)-.5));
+    vec3 cut(float cell,vec2 u){
+      vec2 origin=vec2(mod(cell,4.),floor(cell/4.))*vec2(.25,.5);
+      vec2 inset=.01+mirrored(u)*.98;
+      return texture2D(printPlate,origin+inset*vec2(.25,.5)).rgb;
+    }
+    // Two offset impressions of each swatch, mixed through a soft blotch mask,
+    // break up the repeat and the mirror seams.
+    vec3 swatch(float cell,vec2 u){
+      float m=smoothstep(.35,.65,noise(u*.9+cell*7.));
+      return mix(cut(cell,u),cut(cell,u*1.07+vec2(.37,.71)),m);
     }
     void main() {
-      if(surface>3.5){
-        float tooth=texture2D(printPlate,world.xy*.036).g-.5;
-        if(surface>4.5){
-          float height=smoothstep(-22.,265.,world.y);
-          vec3 dusk=mix(vec3(.89,.66,.49),vec3(.145,.29,.40),height);
-          float moon=1.-smoothstep(18.,19.,distance(world.xy,vec2(340.,168.)));
-          gl_FragColor=vec4(mix(dusk,vec3(1.,.79,.49),moon)+tooth*.12,1.);
-        }else{
-          gl_FragColor=vec4(ink+tooth*.11,1.);
-        }
-        return;
+      vec2 face=vec2(world.x*.6+world.z*.8,world.y);
+      float tone=.9+.2*hash(floor(world.xz*.5+world.y*.3));
+      vec3 color;
+      if(surface>.5&&surface<1.5){
+        color=swatch(0.,vec2(world.z*.42,world.y*1.1+abs(world.x)*.25));
+      } else if(surface>1.5&&surface<2.5){
+        color=swatch(1.,face*vec2(.42,.36));
+      } else if(surface>2.5&&surface<3.5){
+        color=swatch(2.,world.xz*vec2(.16,.3));
+      } else if(surface>5.5&&surface<6.5){
+        float cell=ink.r>ink.g+.25?5.:(ink.r>.8?6.:7.);
+        color=swatch(cell,vec2(world.x*.3+world.z*.2,world.y*.3+world.z*.15));
+      } else if(surface>6.5&&surface<7.5){
+        color=swatch(4.,face*vec2(.6,.5))*1.08;
+      } else {
+        color=swatch(3.,face*vec2(.35,.5));
       }
-      vec2 xy=world.xz+world.y*vec2(.31,.64);
-      float detail=1.-smoothstep(12.,58.,depth);
-      float grain=noise(xy*vec2(14.,24.));
-      float wash=noise(xy*.72);
-      vec3 color=ink;
-      if(surface<1.5 && surface>.5) {
-        // Indigo tile courses with an offset, unprinted lip on each row.
-        float row=world.y*5.+noise(xy*2.)*.06;
-        float seam=ruling(row,.058);
-        float tilePrint=texture2D(printPlate,world.xz*vec2(.19,.24)).r-.5;
-        color=mix(ink,paper,.09+.13*step(.5,fract(row)));
-        color=mix(color,sumi,seam*.46*detail);
-        color=mix(color,paper,ruling(row-.105,.026)*.27*detail);
-        color+=vec3(.46,.43,.37)*tilePrint;
-      } else if(surface>1.5 && surface<2.5) {
-        float grainLine=world.y*8.+world.x*1.6+sin(world.z*1.5+world.y)*.35+wash*.42;
-        color=mix(ink,sumi,ruling(grainLine,.06)*detail*.66);
-        color=mix(color,paper,ruling(grainLine-.2,.024)*detail*.23);
-      } else if(surface>2.5 && surface<3.5) {
-        // Staggered paving blocks, cut into the same ochre colour plate.
-        float row=world.z*.91 + .042*(noise(world.xz*1.3)-.5);
-        vec2 slab=vec2(world.x*.57+.43*hash(vec2(floor(row),3.)),row);
-        slab.x+=.035*(noise(world.xz*2.)-.5);
-        float stone=hash(floor(slab));
-        color=mix(vec3(.42,.46,.46),ink,.27+.46*stone);
-        color=mix(color,paper,.16*wash+.09*grain);
-        color=mix(color,sumi,max(ruling(slab.x,.012),ruling(slab.y,.013))*detail*(.22+.24*wash));
-      }
-      // Coordinates follow the masonry and wood, including vertical shop fronts.
-      vec2 sheet=vec2(world.x+world.z*.73,world.y+world.z*.52-world.x*.24);
-      vec2 impression=texture2D(printPlate,sheet*.41).gb-.5;
-      color=mix(color,paper,.14*smoothstep(.27,.76,wash)+.04*grain);
-      color+=impression.x*vec3(.33,.31,.28)+impression.y*vec3(.22,.17,.12);
+      color*=tone;
       float dist=min(min(edges.x,edges.y),min(edges.z,edges.w));
-      float stroke=clamp(depth*.00095,.016,.065)*(.78+.46*wash);
-      color=mix(color,sumi,(1.-smoothstep(stroke*.44,stroke*1.65,dist))*(.43+.35*detail));
-      color+=detail*(grain-.5)*.052;
-      float fog=smoothstep(15.,137.,depth);
-      gl_FragColor=vec4(mix(color,vec3(.59,.56,.52),fog*.78),1.);
+      float stroke=clamp(depth*.001,.018,.07);
+      float line=(1.-smoothstep(stroke*.5,stroke*1.5,dist))*.45;
+      if(surface>5.5&&surface<6.5)line=0.;
+      color=mix(color,sumi,line);
+      gl_FragColor=vec4(color,1.);
     }`;
   function shader(type, source) {
     const part = gl.createShader(type);
@@ -119,10 +104,13 @@
     const a=bearing(t);
     return [centerX(t)+side*Math.cos(a),y,t-side*Math.sin(a)];
   }
+  let seed=7;
+  const rand=()=>(seed=(seed*16807)%2147483647)/2147483647;
   let lot=null;
   const mesh = [];
   const colors = new Map();
-  function face(a,b,c,d,color) {
+  const materials = new Map();
+  function face(a,b,c,d,color,mat) {
     if (!colors.has(color)) colors.set(color,[1,3,5].map(i=>parseInt(color.slice(i,i+2),16)/255));
     const rgb=colors.get(color);
     // Distances to the four outer edges give a continuous keyblock contour
@@ -130,104 +118,154 @@
     const length=(p,q)=>Math.hypot(p[0]-q[0],p[1]-q[1],p[2]-q[2]);
     const w=Math.max(length(a,b),length(c,d)),h=Math.max(length(a,d),length(b,c));
     const points=[a,b,c,d], edges=[[0,0,w,h],[w,0,0,h],[w,h,0,0],[0,h,w,0]];
-    const material=materials.get(color)||0;
+    const material=mat??materials.get(color)??0;
     const placed=lot?points.map(([x,y,z])=>[
       lot.x+x*lot.cos+(z-lot.t)*lot.sin,lot.y+y,
       lot.t-x*lot.sin+(z-lot.t)*lot.cos
     ]):points;
     for(const i of [0,1,2,0,2,3]) mesh.push(...placed[i],...rgb,...edges[i],material);
   }
-  const timber='#855b40', beam='#aa6845', tile='#40617b', edge='#202c34', plaster='#dbbe93';
-  const materials=new Map([[tile,1],['#63849a',1],['#536e80',1],[timber,2],[beam,2],['#bfa381',3]]);
-  const baseRoof=[tile,'#63849a','#536e80'];
-  const roofColors=[baseRoof,['#535f67','#76828a','#65747c'],['#445d60','#66817f','#586e71'],
-    ['#555768','#787b8c','#686b7b'],['#465972','#6b8096','#5a6e83']];
-  const wallColors=[plaster,'#ceb18e','#e3ccb0','#c8bd9c','#d8b7a0','#bdb7a6','#e0c59e'];
-  const woodColors=[[timber,beam],['#765746','#966d50'],['#855441','#a76249'],
-    ['#715849','#986f53'],['#89694b','#ab8059']];
-  for(const roof of roofColors) for(const pigment of roof) materials.set(pigment,1);
-  for(const wood of woodColors) for(const pigment of wood) materials.set(pigment,2);
-  function block(x,y,z,w,h,l,col) {
+  function block(x,y,z,w,h,l,col,mat) {
     const a=[x,y,z], b=[x+w,y,z], c=[x+w,y,z+l], d=[x,y,z+l];
     const up=p=>[p[0],p[1]+h,p[2]];
-    face(a,b,up(b),up(a),col); face(b,c,up(c),up(b),col);
-    face(c,d,up(d),up(c),col); face(d,a,up(a),up(d),col);
-    face(up(a),up(b),up(c),up(d),col);
+    face(a,b,up(b),up(a),col,mat); face(b,c,up(c),up(b),col,mat);
+    face(c,d,up(d),up(c),col,mat); face(d,a,up(a),up(d),col,mat);
+    face(up(a),up(b),up(c),up(d),col,mat);
   }
-  function roof(x,z,w,l,y,h,roofInk=baseRoof,eaveInk=timber) {
-    const ridge=Math.max(.15,(l-w)*.5);
-    for(const sign of [-1,1]) {
-      const ring=t=>[x+sign*w*.5*t,y+h*(1-t)*(1-t*.45),ridge+(l*.5-ridge)*t];
+
+  // Palette sampled from Edo-period landscape prints.
+  const sumiInk='#1c1d20', lamp='#f0a050', vermilion='#c2452c', vermilionDark='#93321f';
+  const tileInks=[['#5b6866','#6f7c78','#4d5957'],['#55605f','#68736f','#475150'],
+    ['#606a6a','#77817c','#525b5a'],['#4f5c5e','#64716f','#434f51']];
+  const plasterInks=['#d9c39a','#cdb48c','#e0cba5','#c9b28e','#d4bd95'];
+  const woodInks=[['#4a3426','#5e4330'],['#3f2d22','#55402f'],['#53392a','#6a4a35'],['#463328','#5a4232']];
+  for(const set of tileInks)for(const c of set)materials.set(c,1);
+  for(const set of woodInks)for(const c of set)materials.set(c,2);
+  materials.set(lamp,7);
+
+  // Gable roof with a long ridge, upturned eaves and raised tile ribs.
+  function roof(x,z,w,l,y,h,ink=tileInks[0],eaveInk=woodInks[0][0],ridgeLength){
+    const ridge=ridgeLength??Math.max(.15,l*.5-w*.16);
+    const lift=t=>h*(1-t)*(1-t*.55)+h*.12*Math.pow(t,4);
+    for(const sign of [-1,1]){
+      const ring=t=>[x+sign*w*.5*t,y+lift(t),ridge+(l*.5-ridge)*t];
       let last=ring(0);
-      for(let k=1;k<=4;k++){
-        const cur=ring(k/4);
+      for(let k=1;k<=5;k++){
+        const cur=ring(k/5);
         face([last[0],last[1],z-last[2]],[cur[0],cur[1],z-cur[2]],
-          [cur[0],cur[1],z+cur[2]],[last[0],last[1],z+last[2]],sign<0?roofInk[1]:roofInk[0]);
-        for(const end of [-1,1]) {
+          [cur[0],cur[1],z+cur[2]],[last[0],last[1],z+last[2]],sign<0?ink[1]:ink[0]);
+        for(const end of [-1,1]){
           face([x,last[1],z+end*last[2]],[last[0],last[1],z+end*last[2]],
-            [cur[0],cur[1],z+end*cur[2]],[x,cur[1],z+end*cur[2]],roofInk[2]);
+            [cur[0],cur[1],z+end*cur[2]],[x,cur[1],z+end*cur[2]],ink[2]);
         }
         last=cur;
       }
-      block(x+sign*w/2-.04,y-.12,z-l/2,.08,.14,l,edge);
-      // Narrow raised tiles follow the slope from the ridge towards the eaves.
-      const ribs=Math.ceil(l/.48);
+      block(x+sign*w/2-.05,y+lift(1)-.14,z-l/2,.1,.16,l,sumiInk,0);
+      const ribs=Math.ceil(l/.6);
       for(let j=0;j<=ribs;j++){
         const f=j/ribs*2-1;
-        for(let k=0;k<4;k++){
-          const a=ring(k/4),b=ring((k+1)/4);
-          face([a[0],a[1]+.024,z+f*a[2]],[b[0],b[1]+.024,z+f*b[2]],
-            [b[0],b[1]+.024,z+f*b[2]+.035],[a[0],a[1]+.024,z+f*a[2]+.035],edge);
+        for(let k=0;k<5;k++){
+          const a=ring(k/5),b=ring((k+1)/5);
+          face([a[0],a[1]+.03,z+f*a[2]],[b[0],b[1]+.03,z+f*b[2]],
+            [b[0],b[1]+.03,z+f*b[2]+.05],[a[0],a[1]+.03,z+f*a[2]+.05],ink[2],1);
         }
       }
     }
-    block(x-.11,y+h,z-ridge-.15,.22,.14,ridge*2+.3,edge);
-    for(const end of [-1,1])block(x-w/2,y-.12,z+end*l/2,w,.15,.09,eaveInk);
+    block(x-.14,y+h-.02,z-ridge-.2,.28,.22,ridge*2+.4,sumiInk,0);
+    for(const end of [-1,1])block(x-w/2,y-.1,z+end*l/2,w,.14,.1,eaveInk,2);
   }
-  // Street runs along +Z. Shopfronts on both sides face the centre line.
+
+  // A tree is a stack of irregular rings; pines are flattened tiers.
+  function tree(x,y,z,r,ink,kind){
+    const sides=10, tiers=kind==='pine'?4:5;
+    block(x-r*.08,y,z-r*.08,r*.16,r*.9,r*.16,'#3a2c22',2);
+    const wob=[];for(let s=0;s<sides;s++)wob.push(.8+rand()*.4);
+    for(let k=0;k<tiers;k++){
+      let ry, rad, rad2, y0, y1;
+      if(kind==='pine'){
+        y0=y+r*(.7+k*.42); y1=y0+r*.22; rad=r*(1.05-k*.2); rad2=rad*.8;
+      }else{
+        const a=k/tiers*Math.PI, b=(k+1)/tiers*Math.PI;
+        y0=y+r*(1.1-Math.cos(a)); y1=y+r*(1.1-Math.cos(b));
+        rad=r*Math.sin(a)+.02; rad2=r*Math.sin(b)+.02;
+      }
+      for(let s=0;s<sides;s++){
+        const a0=s/sides*Math.PI*2, a1=(s+1)/sides*Math.PI*2, w0=wob[s], w1=wob[(s+1)%sides];
+        face([x+Math.cos(a0)*rad*w0,y0,z+Math.sin(a0)*rad*w0],[x+Math.cos(a1)*rad*w1,y0,z+Math.sin(a1)*rad*w1],
+          [x+Math.cos(a1)*rad2*w1,y1,z+Math.sin(a1)*rad2*w1],[x+Math.cos(a0)*rad2*w0,y1,z+Math.sin(a0)*rad2*w0],ink,6);
+      }
+      if(kind==='pine'||k===tiers-1){
+        for(let s=0;s<sides;s+=2){
+          const a0=s/sides*Math.PI*2,a1=(s+1)/sides*Math.PI*2,a2=(s+2)/sides*Math.PI*2;
+          face([x,y1,z],[x+Math.cos(a0)*rad2,y1,z+Math.sin(a0)*rad2],
+            [x+Math.cos(a1)*rad2,y1,z+Math.sin(a1)*rad2],[x+Math.cos(a2)*rad2,y1,z+Math.sin(a2)*rad2],ink,6);
+        }
+      }
+    }
+  }
+  const foliage={sakura:['#e9b7b9','#f0c9c6','#dfa4ab'],maple:['#d3542c','#e0703a','#c4432a'],
+    green:['#4d6a3c','#5c7a45','#3f5c37'],pine:['#2e4a36','#36553c']};
+  const pick=a=>a[Math.floor(rand()*a.length)];
+  function randomTree(x,y,z,r){
+    const roll=rand();
+    if(roll<.22)tree(x,y,z,r,pick(foliage.sakura),'round');
+    else if(roll<.40)tree(x,y,z,r,pick(foliage.maple),'round');
+    else if(roll<.70)tree(x,y,z,r*1.1,pick(foliage.pine),'pine');
+    else tree(x,y,z,r,pick(foliage.green),'round');
+  }
+
+  // Machiya shopfronts along +Z: dark timber lattice lit from within,
+  // pale plaster above, lanterns and noren under the eaves.
   function shop(side,z,i){
-    const id=(side<0 ? i*2 : (i-2)*2+1);
-    const roofInk=roofColors[(id*3+Math.floor(id/5))%roofColors.length];
-    const wallInk=wallColors[(id*3)%wallColors.length];
-    const [woodInk,beamInk]=woodColors[(id+Math.floor(id/7))%woodColors.length];
-    const h=3.1+((i*7+(side+1)*3)%5)*.48;
+    const id=(side<0?i*2:(i-2)*2+1);
+    const tile=tileInks[(id*3+Math.floor(id/5))%tileInks.length];
+    const plaster=plasterInks[(id*3)%plasterInks.length];
+    const [wood,beam]=woodInks[(id+Math.floor(id/7))%woodInks.length];
+    const h=3.2+((i*7+(side+1)*3)%5)*.45;
     const w=4.6+(i%3)*.4,l=5.6+(i%2)*.65;
     const x=side*(4.45+w/2+(i%3)*.22);
     const front=x-side*w/2;
-    block(x-w/2,-1.65,z-l/2,w,1.65,l,'#81776a');
-    block(x-w/2,0,z-l/2,w,h,l,wallInk);
+    block(x-w/2,-1.65,z-l/2,w,1.65,l,'#7b746a',3);
+    block(x-w/2,0,z-l/2,w,h,l,wood);
+    block(front-side*.02-.04,2.25,z-l/2+.1,.08,h-2.35,l-.2,plaster,0);
     for(let n=0;n<6;n++){
       const zz=z-l/2+.2+n*(l-.4)/5;
-      block(front-.055,.06,zz,.11,h-.1,.105,woodInk);
+      block(front-.07,.06,zz,.14,h-.1,.12,beam);
     }
     for(let n=0;n<3;n++){
-      const zz=z-l/2+.25+n*(l-.45)/3, len=(l-.65)/3;
-      block(front-.065,.3,zz,.13,1.65,len,n===1?beamInk:'#d4b888');
-      for(let j=1;j<7;j++)block(front-.08,.3,zz+j*len/7,.16,1.65,.035,woodInk);
-      block(front-.09,1.1,zz,.18,.055,len,woodInk);
+      const zz=z-l/2+.3+n*(l-.5)/3, len=(l-.75)/3;
+      block(front-.05,.35,zz,.1,1.55,len,lamp);
+      for(let j=1;j<9;j++)block(front-.1,.35,zz+j*len/9,.2,1.55,.04,wood);
+      block(front-.11,1.12,zz,.22,.05,len,wood);
     }
-    block(front-.1,2.05,z-l/2,.2,.14,l,beamInk);
-    const awning=front-side*.78;
-    face([front,2.7,z-l/2],[awning,2.32,z-l/2],[awning,2.32,z+l/2],[front,2.7,z+l/2],roofInk[0]);
-    block(awning-.12,2.22,z-l/2,.24,.12,l,edge);
+    block(front-.12,2.05,z-l/2,.24,.16,l,beam);
+    // Upper-storey mushiko window glowing through its slats.
+    block(front-side*.03-.05,2.55,z-l*.22,.1,.6,l*.44,lamp);
+    for(let j=0;j<8;j++)block(front-side*.06-.07,2.55,z-l*.22+j*l*.44/7,.14,.6,.05,wood);
+    const awning=front-side*.85;
+    face([front,2.75,z-l/2],[awning,2.35,z-l/2],[awning,2.35,z+l/2],[front,2.75,z+l/2],tile[0],1);
+    block(awning-.12,2.25,z-l/2,.24,.12,l,sumiInk,0);
     if(i%3!==0){
-      const cloth=['#345053','#8d5343','#4f5966'][i%3];
-      for(let k=0;k<3;k++) block(awning-.035,1.63,z-.66+k*.44,.07,.55,.41,cloth);
+      const cloth=['#2f4a5c','#8a3b2c','#3d4f3c'][i%3];
+      for(let k=0;k<3;k++)block(awning-.035,1.6,z-.66+k*.44,.07,.62,.41,cloth,0);
     }
-    block(awning-.19,1.53,z-l*.36,.38,.52,.38,'#e2a968');
-    block(awning-.19,2.02,z-l*.36,.38,.06,.38,woodInk);
-    roof(x,z,w+1.05,l+.58,h,1.7,roofInk,woodInk);
+    block(awning-.2,1.45,z-l*.36,.4,.6,.4,lamp);
+    block(awning-.2,2.05,z-l*.36,.4,.07,.4,sumiInk,0);
+    block(awning-.2,1.38,z-l*.36,.4,.07,.4,sumiInk,0);
+    roof(x,z,w+1.1,l+.6,h,1.75,tile,wood);
   }
+
+  // Stone stair street, with granite curbs and a moss strip beyond.
   const tread=1.05, halfWidth=3.7;
   for(let i=-50;i<236;i++){
     const t=i*tread,end=t+tread,y=elevation(t);
     const left=streetPoint(-halfWidth,t,y),right=streetPoint(halfWidth,t,y);
     const nextLeft=streetPoint(-halfWidth,end,y),nextRight=streetPoint(halfWidth,end,y);
-    face(left,right,nextRight,nextLeft,'#bfa381');
-    face(nextLeft,nextRight,streetPoint(halfWidth,end,elevation(end)),streetPoint(-halfWidth,end,elevation(end)),'#887866');
+    face(left,right,nextRight,nextLeft,'#a59a86',3);
+    face(nextLeft,nextRight,streetPoint(halfWidth,end,elevation(end)),streetPoint(-halfWidth,end,elevation(end)),'#6d665b',0);
     for(const sign of [-1,1]){
       face(streetPoint(sign*halfWidth,t,y-.05),streetPoint(sign*14,t,y-.05),
-        streetPoint(sign*14,end,elevation(end)-.05),streetPoint(sign*halfWidth,end,elevation(end)-.05),'#927e67');
+        streetPoint(sign*14,end,elevation(end)-.05),streetPoint(sign*halfWidth,end,elevation(end)-.05),'#6e6858',3);
     }
   }
   for(let i=0;i<38;i++){
@@ -238,52 +276,6 @@
     }
   }
   lot=null;
-
-  // The entire valley is projected by the street camera, including the skyline.
-  const skyInk='#506b80';
-  materials.set(skyInk,5);
-  for(let i=0;i<64;i++){
-    const a=i*Math.PI/32,b=(i+1)*Math.PI/32;
-    const x=850*Math.sin(a),z=850*Math.cos(a),xx=850*Math.sin(b),zz=850*Math.cos(b);
-    face([x,-1800,z],[xx,-1800,zz],[xx,1800,zz],[x,1800,z],skyInk);
-  }
-  for(const [distance,base,amplitude,pigment] of [
-    [580,47,22,'#748286'],[465,21,15,'#606f71'],[350,-4,11,'#526561']
-  ]){
-    materials.set(pigment,4);
-    const ridge=x=>base+amplitude*(.68*Math.sin(x*.014+distance)+.29*Math.sin(x*.044)+.12*Math.cos(x*.089));
-    for(let x=-1900;x<1900;x+=8){
-      face([x,-220,distance],[x+8,-220,distance],[x+8,ridge(x+8),distance],[x,ridge(x),distance],pigment);
-    }
-  }
-  face([-1500,-64,-100],[1500,-64,-100],[1500,-64,700],[-1500,-64,700],'#928770');
-  for(let t=-60;t<250;t+=5){
-    const y=elevation(t)-2.3,nextY=elevation(t+5)-2.3;
-    face([-340,y,t],[340,y,t],[340,nextY,t+5],[-340,nextY,t+5],'#928770');
-  }
-  for(let row=0;row<6;row++){
-    for(let n=-15;n<=15;n++){
-      const x=n*9+3*Math.sin(row+n),t=50+row*28+4*Math.cos(n*3+row);
-      if(Math.abs(x-centerX(t))<18)continue;
-      const floor=elevation(t)-1.2,h=3.5+.8*Math.sin(n*row+2);
-      block(x-3,floor-4,t-3,6,h+4,6,wallColors[Math.abs(n+row)%wallColors.length]);
-      roof(x,t,7.3,8,floor+h,2.1);
-    }
-  }
-  // Landmarks sit on terraces, so they keep their place as the camera turns.
-  const towerX=-35,towerZ=78,base=elevation(towerZ)+4;
-  block(towerX-5,base-10,towerZ-5,10,10,10,'#81776a');
-  for(let k=0;k<5;k++){
-    const width=11-k*1.5,y=base+k*3.8;
-    block(towerX-width*.32,y,towerZ-width*.32,width*.64,2.8,width*.64,timber);
-    roof(towerX,towerZ,width,width,y+2.7,1.9);
-  }
-  block(towerX-.12,base+20,towerZ-.12,.24,3.2,.24,edge);
-  const templeY=elevation(82)+9;
-  for(const x of [28,34,40])for(const t of [77,83,89])block(x,templeY-16,t,.7,16,.7,timber);
-  block(26,templeY-1,75,17,1.2,16,beam);
-  block(28,templeY,77,13,4.3,12,plaster);
-  roof(34.5,83,17,19,templeY+4.2,3.8);
 
   let program, eye, aspect, heading;
   function setup() {
@@ -300,27 +292,43 @@
       const id=gl.getAttribLocation(program,name);gl.enableVertexAttribArray(id);
       gl.vertexAttribPointer(id,name==='material'?1:name==='faceEdges'?4:3,gl.FLOAT,false,44,offset);
     }
+    // Build the swatch atlas from regions of the painted backdrop.
     const plate=gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D,plate);
-    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([128,128,128,255]));
-    gl.generateMipmap(gl.TEXTURE_2D);
-    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([90,90,90,255]));
     const image=new Image();
     image.onload=()=>{
       if(!gl.isTexture(plate))return;
+      const atlas=document.createElement('canvas');atlas.width=1024;atlas.height=512;
+      const g=atlas.getContext('2d');
+      // [x,y,w,h] in the 1774x887 painting: tiles, timber lattice, stone steps,
+      // plaster, lit shoji, maple, cherry blossom, green canopy.
+      [[0,0,1,1],[478,645,120,140],[905,805,170,72],[336,572,105,40],
+       [612,812,42,62],[1190,598,150,80],[20,400,170,100],[1240,690,120,70]]
+        .forEach(([x,y,w,h],i)=>g.drawImage(image,x,y,w,h,(i%4)*256,Math.floor(i/4)*256,256,256));
+      // The foreground roof's courses rise about 20 degrees; rotate them level.
+      g.save();g.beginPath();g.rect(0,0,256,256);g.clip();
+      g.translate(128,128);g.scale(256/230,256/120);g.rotate(20*Math.PI/180);
+      g.drawImage(image,-1500,-790);g.restore();
       gl.bindTexture(gl.TEXTURE_2D,plate);
-      gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL,gl.NONE);
-      gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,image);
-      gl.generateMipmap(gl.TEXTURE_2D);
+      gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,atlas);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
       requestDraw();
     };
-    image.src='assets/kyoto-print.png';
+    image.src='assets/kyoto.webp';
     heading=gl.getUniformLocation(program,'heading');
     eye=gl.getUniformLocation(program,'eye');aspect=gl.getUniformLocation(program,'aspect');
     gl.enable(gl.DEPTH_TEST);gl.clearColor(0,0,0,0);
   }
   let z=0,target=0,previous=0,elapsed=0,frame=0;
-  const city=canvas.parentElement, runner=city.querySelector('.runner');
+  // Heading range over the scroll span sizes the painted backdrop.
+  const headingAt=t=>Math.atan((centerX(t+10)-centerX(t))/10);
+  const restAngle=headingAt(0), panScale=.12;
+  let minAngle=restAngle,maxAngle=restAngle;
+  for(let t=-20;t<=100;t++){minAngle=Math.min(minAngle,headingAt(t));maxAngle=Math.max(maxAngle,headingAt(t));}
+  const city=canvas.parentElement, backdrop=city.querySelector('.skyline');
   function draw(now){
     frame=0;
     if(document.hidden||gl.isContextLost())return;
@@ -340,20 +348,16 @@
     gl.uniform2f(heading,sin,cos);
     gl.uniform3f(eye,centerX(z),altitude,z);gl.uniform1f(aspect,w/h);
     gl.drawArrays(gl.TRIANGLES,0,mesh.length/11);
-    // Project the passing silhouette onto a nearby roof in world coordinates.
-    const jump=elapsed%21-16;
-    runner.style.opacity=moving && jump>0 && jump<1.3 ? '1':'0';
-    if(jump>0 && jump<1.3){
-      const t=jump/1.3;
-      const deltaZ=Math.floor((z+20+32)/7.1)*7.1-32+7*t-z;
-      const target=streetPoint(6.4,z+deltaZ,elevation(z+deltaZ)+5.3+2*Math.sin(Math.PI*t));
-      const dx=target[0]-centerX(z),dz=target[2]-z;
-      const lateral=dx*cos-dz*sin, forward=dx*sin+dz*cos;
-      const dy=target[1]-altitude;
-      const d=forward*cityCamera.cosPitch-dy*cityCamera.sinPitch;
-      const sx=w/2+lateral*(h*cityCamera.lens/2)/d,sy=h/2-(dy*cityCamera.cosPitch+forward*cityCamera.sinPitch)*(h*cityCamera.lens/2)/d;
-      runner.style.transform='translate('+sx+'px,'+(sy-32)+'px) scale('+(h*.028/d)+')';
-    }
+    // The painting sits at infinity, so it turns with the camera one-for-one:
+    // a pan of r radians slides it by focal*tan(r) pixels the other way.
+    // Damped below one-for-one so the whole painting, pagoda included, stays in frame.
+    const focal=h*cityCamera.lens/2*panScale, rel=angle-restAngle;
+    const leftNeed=focal*Math.tan(-minAngle+restAngle+.04), rightNeed=focal*Math.tan(maxAngle-restAngle+.04);
+    const imgW=Math.max(w+leftNeed+rightNeed,h*2), imgH=imgW/2;
+    const left0=-leftNeed-(imgW-w-leftNeed-rightNeed)/2;
+    const top=Math.min(0,Math.max(h-imgH,h*.5-.47*imgH));
+    Object.assign(backdrop.style,{inset:'auto',left:left0+'px',top:top+'px',width:imgW+'px',height:imgH+'px',
+      backgroundSize:'100% 100%',transform:'translateX('+(-Math.tan(rel)*focal)+'px)'});
     city.classList.add('rendering');
     if(moving||Math.abs(target-z)>.003)requestDraw();
   }
