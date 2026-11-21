@@ -30,6 +30,7 @@
     varying vec3 ink, world;
     varying vec4 edges;
     varying float depth, surface;
+    uniform sampler2D printPlate;
     const vec3 sumi = vec3(.049,.058,.064);
     const vec3 paper = vec3(.91,.80,.62);
     float hash(vec2 p) {
@@ -56,9 +57,11 @@
         // Indigo tile courses with an offset, unprinted lip on each row.
         float row=world.y*5.+noise(xy*2.)*.06;
         float seam=ruling(row,.058);
+        float tilePrint=texture2D(printPlate,world.xz*vec2(.19,.24)).r-.5;
         color=mix(ink,paper,.09+.13*step(.5,fract(row)));
-        color=mix(color,sumi,seam*.82*detail);
-        color=mix(color,paper,ruling(row-.105,.026)*.48*detail);
+        color=mix(color,sumi,seam*.46*detail);
+        color=mix(color,paper,ruling(row-.105,.026)*.27*detail);
+        color+=vec3(.46,.43,.37)*tilePrint;
       } else if(surface>1.5 && surface<2.5) {
         float grainLine=world.y*8.+world.x*1.6+sin(world.z*1.5+world.y)*.35+wash*.42;
         color=mix(ink,sumi,ruling(grainLine,.06)*detail*.66);
@@ -73,12 +76,11 @@
         color=mix(color,paper,.16*wash+.09*grain);
         color=mix(color,sumi,max(ruling(slab.x,.012),ruling(slab.y,.013))*detail*(.22+.24*wash));
       }
-      // Broken pigment and paper tooth across the same printed sheet as the skyline.
-      color=mix(color,paper,.16*smoothstep(.27,.76,wash)+.06*grain);
-      vec2 sheet=gl_FragCoord.xy;
-      float tooth=.54*noise(sheet*.53)+.31*noise(sheet*vec2(.17,.34))+.15*noise(sheet*.069);
-      color+=(tooth-.5)*vec3(.22,.197,.16);
-      color=mix(color,paper,smoothstep(.59,.82,tooth)*.21);
+      // Coordinates follow the masonry and wood, including vertical shop fronts.
+      vec2 sheet=vec2(world.x+world.z*.73,world.y+world.z*.52-world.x*.24);
+      vec2 impression=texture2D(printPlate,sheet*.41).gb-.5;
+      color=mix(color,paper,.14*smoothstep(.27,.76,wash)+.04*grain);
+      color+=impression.x*vec3(.33,.31,.28)+impression.y*vec3(.22,.17,.12);
       float dist=min(min(edges.x,edges.y),min(edges.z,edges.w));
       float stroke=clamp(depth*.00095,.016,.065)*(.78+.46*wash);
       color=mix(color,sumi,(1.-smoothstep(stroke*.44,stroke*1.65,dist))*(.43+.35*detail));
@@ -224,6 +226,21 @@
       const id=gl.getAttribLocation(program,name);gl.enableVertexAttribArray(id);
       gl.vertexAttribPointer(id,name==='material'?1:name==='faceEdges'?4:3,gl.FLOAT,false,44,offset);
     }
+    const plate=gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D,plate);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([128,128,128,255]));
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);
+    const image=new Image();
+    image.onload=()=>{
+      if(!gl.isTexture(plate))return;
+      gl.bindTexture(gl.TEXTURE_2D,plate);
+      gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL,gl.NONE);
+      gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,image);
+      gl.generateMipmap(gl.TEXTURE_2D);
+      requestDraw();
+    };
+    image.src='assets/kyoto-print.png';
     eye=gl.getUniformLocation(program,'eye');aspect=gl.getUniformLocation(program,'aspect');
     gl.enable(gl.DEPTH_TEST);gl.clearColor(0,0,0,0);
   }
