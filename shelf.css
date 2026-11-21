@@ -182,3 +182,5 @@ header {position:relative;z-index:8}
 @media(max-width:620px){#filter-toggle strong{position:static;transform:none;margin-right:auto;white-space:nowrap}}
 
 .skyline{transform-origin:50% 45%}
+
+.result-count,#count{color:#fff}
