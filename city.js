@@ -12,10 +12,12 @@
     varying float surface;
     uniform vec3 eye;
     uniform float aspect;
+    uniform vec2 heading;
     varying vec3 ink, world;
     varying float depth;
     void main() {
       vec3 p = point - eye;
+      p.xz=vec2(p.x*heading.y-p.z*heading.x,p.x*heading.x+p.z*heading.y);
       float d = p.z * ${cityCamera.cosPitch} - p.y * ${cityCamera.sinPitch};
       float h = p.y * ${cityCamera.cosPitch} + p.z * ${cityCamera.sinPitch};
       gl_Position = vec4(p.x*${cityCamera.lens}/aspect,h*${cityCamera.lens},d*1.00143-0.20014,d);
@@ -96,6 +98,15 @@
     return part;
   }
 
+  // Distance along the street sets both its centre line and the elevation of each terrace.
+  const centerX=t=>5.6*Math.sin(t/15)+2.4*Math.sin(t/8+.25);
+  const elevation=t=>-.24*t-1.1*Math.sin(t/16);
+  const bearing=t=>Math.atan((centerX(t+.1)-centerX(t-.1))/.2);
+  function streetPoint(side,t,y){
+    const a=bearing(t);
+    return [centerX(t)+side*Math.cos(a),y,t-side*Math.sin(a)];
+  }
+  let lot=null;
   const mesh = [];
   const colors = new Map();
   function face(a,b,c,d,color) {
@@ -107,7 +118,11 @@
     const w=Math.max(length(a,b),length(c,d)),h=Math.max(length(a,d),length(b,c));
     const points=[a,b,c,d], edges=[[0,0,w,h],[w,0,0,h],[w,h,0,0],[0,h,w,0]];
     const material=materials.get(color)||0;
-    for(const i of [0,1,2,0,2,3]) mesh.push(...points[i],...rgb,...edges[i],material);
+    const placed=lot?points.map(([x,y,z])=>[
+      lot.x+x*lot.cos+(z-lot.t)*lot.sin,lot.y+y,
+      lot.t-x*lot.sin+(z-lot.t)*lot.cos
+    ]):points;
+    for(const i of [0,1,2,0,2,3]) mesh.push(...placed[i],...rgb,...edges[i],material);
   }
   const timber='#855b40', beam='#aa6845', tile='#40617b', edge='#202c34', plaster='#dbbe93';
   const materials=new Map([[tile,1],['#63849a',1],['#536e80',1],[timber,2],[beam,2],['#bfa381',3]]);
@@ -164,8 +179,9 @@
     const [woodInk,beamInk]=woodColors[(id+Math.floor(id/7))%woodColors.length];
     const h=3.1+((i*7+(side+1)*3)%5)*.48;
     const w=4.6+(i%3)*.4,l=5.6+(i%2)*.65;
-    const x=side*(5.3+w/2+(i%3)*.22);
+    const x=side*(4.45+w/2+(i%3)*.22);
     const front=x-side*w/2;
+    block(x-w/2,-1.65,z-l/2,w,1.65,l,'#81776a');
     block(x-w/2,0,z-l/2,w,h,l,wallInk);
     for(let n=0;n<6;n++){
       const zz=z-l/2+.2+n*(l-.4)/5;
@@ -189,29 +205,28 @@
     block(awning-.19,2.02,z-l*.36,.38,.06,.38,woodInk);
     roof(x,z,w+1.05,l+.58,h,1.7,roofInk,woodInk);
   }
-  block(-85,-.31,-55,170,.22,305,'#927e67');
-  block(-4.6,-.09,-55,9.2,.07,305,'#bfa381');
-  for(let i=0;i<38;i++){
-    const z=i*7.1-32;
-    shop(-1,z,i);shop(1,z+1.65,i+2);
-  }
-  for(const [x,z] of [[-15,35],[17,123],[-16,197]]){
-    block(x-3.1,0,z-3.1,6.2,3.1,6.2,timber);
-    for(let i=0;i<5;i++){
-      const size=10-i*1.38,base=3+i*3.2;
-      block(x-size*.31,base,z-size*.31,size*.62,2.8,size*.62,beam);
-      const half=size*.31;
-      block(x-half-.13,base+.25,z-half-.13,size*.62+.26,.15,size*.62+.26,timber);
-      for(let j=-2;j<=2;j++){
-        block(x+j*half*.44-.045,base+.48,z-half-.07,.09,1.5,.14,timber);
-      }
-      block(x-half,base+1.88,z-half-.1,size*.62,.13,.2,timber);
-      roof(x,z,size,size,base+2.2,1.75);
+  const tread=1.05, halfWidth=3.7;
+  for(let i=-50;i<236;i++){
+    const t=i*tread,end=t+tread,y=elevation(t);
+    const left=streetPoint(-halfWidth,t,y),right=streetPoint(halfWidth,t,y);
+    const nextLeft=streetPoint(-halfWidth,end,y),nextRight=streetPoint(halfWidth,end,y);
+    face(left,right,nextRight,nextLeft,'#bfa381');
+    face(nextLeft,nextRight,streetPoint(halfWidth,end,elevation(end)),streetPoint(-halfWidth,end,elevation(end)),'#887866');
+    for(const sign of [-1,1]){
+      face(streetPoint(sign*halfWidth,t,y-.05),streetPoint(sign*14,t,y-.05),
+        streetPoint(sign*14,end,elevation(end)-.05),streetPoint(sign*halfWidth,end,elevation(end)-.05),'#927e67');
     }
-    block(x-.09,19,z-.09,.18,3.2,.18,edge);
   }
+  for(let i=0;i<38;i++){
+    for(const side of [-1,1]){
+      const t=i*7.1-32+(side>0?1.65:0),a=bearing(t);
+      lot={t,x:centerX(t),y:elevation(t),cos:Math.cos(a),sin:Math.sin(a)};
+      shop(side,t,i+(side>0?2:0));
+    }
+  }
+  lot=null;
 
-  let program, eye, aspect;
+  let program, eye, aspect, heading;
   function setup() {
     program=gl.createProgram();
     gl.attachShader(program,shader(gl.VERTEX_SHADER,vertex));
@@ -241,6 +256,7 @@
       requestDraw();
     };
     image.src='assets/kyoto-print.png';
+    heading=gl.getUniformLocation(program,'heading');
     eye=gl.getUniformLocation(program,'eye');aspect=gl.getUniformLocation(program,'aspect');
     gl.enable(gl.DEPTH_TEST);gl.clearColor(0,0,0,0);
   }
@@ -259,8 +275,11 @@
     }
     gl.viewport(0,0,canvas.width,canvas.height);
     gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
-    const altitude=5.7;
-    gl.uniform3f(eye,0,altitude,z);gl.uniform1f(aspect,w/h);
+    const altitude=elevation(z)+5.0;
+    const angle=Math.atan((centerX(z+10)-centerX(z))/10);
+    const sin=Math.sin(angle),cos=Math.cos(angle);
+    gl.uniform2f(heading,sin,cos);
+    gl.uniform3f(eye,centerX(z),altitude,z);gl.uniform1f(aspect,w/h);
     gl.drawArrays(gl.TRIANGLES,0,mesh.length/11);
     // Project the passing silhouette onto a nearby roof in world coordinates.
     const jump=elapsed%21-16;
@@ -268,9 +287,12 @@
     if(jump>0 && jump<1.3){
       const t=jump/1.3;
       const deltaZ=Math.floor((z+20+32)/7.1)*7.1-32+7*t-z;
-      const dy=5.3+2*Math.sin(Math.PI*t)-altitude;
-      const d=deltaZ*cityCamera.cosPitch-dy*cityCamera.sinPitch;
-      const sx=w/2+6.4*(h*cityCamera.lens/2)/d,sy=h/2-(dy*cityCamera.cosPitch+deltaZ*cityCamera.sinPitch)*(h*cityCamera.lens/2)/d;
+      const target=streetPoint(6.4,z+deltaZ,elevation(z+deltaZ)+5.3+2*Math.sin(Math.PI*t));
+      const dx=target[0]-centerX(z),dz=target[2]-z;
+      const lateral=dx*cos-dz*sin, forward=dx*sin+dz*cos;
+      const dy=target[1]-altitude;
+      const d=forward*cityCamera.cosPitch-dy*cityCamera.sinPitch;
+      const sx=w/2+lateral*(h*cityCamera.lens/2)/d,sy=h/2-(dy*cityCamera.cosPitch+forward*cityCamera.sinPitch)*(h*cityCamera.lens/2)/d;
       runner.style.transform='translate('+sx+'px,'+(sy-32)+'px) scale('+(h*.028/d)+')';
     }
     city.classList.add('rendering');
