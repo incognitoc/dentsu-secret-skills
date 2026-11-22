@@ -49,17 +49,14 @@ main {width:min(1250px,96%)}.hero {justify-content:center;text-align:center;min-
 #filter-toggle strong {color:#fff;position:absolute;left:50%;transform:translateX(-50%)}
 #topics .options button {
   --bamboo:#d2ba88;--sheen:#efdfb4;--shade:#ac8e60;
-  font-size:.86rem;padding:4px 10px;border:1px solid #725c3b;border-radius:3px;
-  color:#362c1c;text-shadow:none;
-  background-color:var(--bamboo);
-  background-image:linear-gradient(92deg,transparent 4px,#583f262f 5px,#fff3 6px,transparent 8px),
-    repeating-linear-gradient(2deg,transparent 0 3px,#66462216 4px,transparent 5px 9px),
-    linear-gradient(to bottom,var(--shade),var(--sheen) 18%,var(--bamboo) 60%,var(--shade));
-  box-shadow:inset 0 1px #fff5,0 1px 3px #17201855;
+  font-size:.86rem;padding:4px 10px;border:1px solid #d2ba88;border-radius:3px;
+  color:#fff2ca;text-shadow:0 1px 2px #000a;
+  background:transparent;
+  box-shadow:none;
 }
 #topics .options button[aria-pressed=true] {
-  --bamboo:#4c5941;--sheen:#58674b;--shade:#354332;
-  color:#fff2ca;border-color:#e6d8ad;box-shadow:inset 0 0 0 1px #263622,0 1px 3px #17201855;
+  color:#fff;border-color:#fff2ca;box-shadow:inset 0 0 0 1px #fff2ca;
+  background:#0d1a1a99;
 }
 #topics .options button:hover {border-color:#f2dc9e}
 #topics button:not([aria-pressed]){text-shadow:inherit}
@@ -184,3 +181,11 @@ header {position:relative;z-index:8}
 .skyline{transform-origin:50% 45%}
 
 .result-count,#count{color:#fff}
+/* Book-opening animation that plays before the reader lightbox. */
+.book-opening {position:fixed;z-index:50;transform-origin:0 0;perspective:1400px;pointer-events:none}
+.book-opening .pages,.book-opening .lid {position:absolute;inset:0;border-radius:2px}
+.book-opening .pages {background:linear-gradient(90deg,#d9c9a2,#f3e8cc 12%,#efe2c1);box-shadow:0 18px 40px #0008,inset 0 0 0 1px #b9a77f}
+.book-opening .lid {transform-origin:0 50%;transform-style:preserve-3d}
+.book-opening .lid>div {position:absolute;inset:0;border-radius:2px;backface-visibility:hidden;-webkit-backface-visibility:hidden;box-shadow:0 10px 30px #0006}
+.book-opening .front {background-size:100% 100%}
+.book-opening .back {transform:rotateY(180deg);background:#e8dcbc;box-shadow:inset 0 0 0 1px #b9a77f}

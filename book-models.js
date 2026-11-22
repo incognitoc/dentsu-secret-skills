@@ -63,10 +63,11 @@
     const start=vertices.length/9;
     const a=[0,0,0],b=[1,0,0],c=[1,1,0],d=[0,1,0];
     if(worn){
-      const cut=[.78,0,0],end=[1,.15,0];
-      triangle(a,cut,d,fabric);triangle(c,d,cut,fabric);triangle(c,cut,end,fabric);
-      triangle(cut,end,[.795,.141,.026],[.87,.78,.58,0]);
-      triangle(cut,[.795,.141,.026],[.784,.153,.001],thread);
+      // Dog-ear on the bottom-right corner.
+      const cut=[.78,1,0],end=[1,.85,0];
+      triangle(a,b,end,fabric);triangle(a,end,cut,fabric);triangle(a,cut,d,fabric);
+      triangle(cut,end,[.795,.859,.026],[.87,.78,.58,0]);
+      triangle(cut,[.795,.859,.026],[.784,.847,.001],thread);
     }else quad(a,b,c,d,fabric);
     // Independent text block, board on the back, sewn spine and ruled page edges.
     const z=-.10;
@@ -125,7 +126,8 @@
     gl.bindTexture(gl.TEXTURE_2D,entry.id);
     const aged=readBooks.has(item.article.id);
     if(entry.aged!==aged){
-      gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,gl.RGB,gl.UNSIGNED_BYTE,coverArt(item));
+      item.cover=coverArt(item);
+      gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,gl.RGB,gl.UNSIGNED_BYTE,item.cover);
       for(const key of [gl.TEXTURE_WRAP_S,gl.TEXTURE_WRAP_T])gl.texParameteri(gl.TEXTURE_2D,key,gl.CLAMP_TO_EDGE);
       for(const key of [gl.TEXTURE_MAG_FILTER,gl.TEXTURE_MIN_FILTER])gl.texParameteri(gl.TEXTURE_2D,key,gl.LINEAR);
       entry.aged=aged;

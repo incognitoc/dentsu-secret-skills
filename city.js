@@ -97,13 +97,15 @@
   }
 
   // Distance along the street sets both its centre line and the elevation of each terrace.
-  const centerX=t=>5.6*Math.sin(t/15)+2.4*Math.sin(t/8+.25);
+  const centerX=t=>5.6*Math.sin(t/16)+2.4*Math.sin(t/8+.25);
   const elevation=t=>-.24*t-1.1*Math.sin(t/16);
   const bearing=t=>Math.atan((centerX(t+.1)-centerX(t-.1))/.2);
   function streetPoint(side,t,y){
     const a=bearing(t);
     return [centerX(t)+side*Math.cos(a),y,t-side*Math.sin(a)];
   }
+  // Path, terraces and shops all repeat every PERIOD, so the walk can loop forever.
+  const PERIOD=32*Math.PI, LOTS=14;
   let seed=7;
   const rand=()=>(seed=(seed*16807)%2147483647)/2147483647;
   let lot=null;
@@ -270,9 +272,10 @@
   }
   for(let i=0;i<38;i++){
     for(const side of [-1,1]){
-      const t=i*7.1-32+(side>0?1.65:0),a=bearing(t);
+      const k=i%LOTS,t=i*PERIOD/LOTS-32+(side>0?1.65:0),a=bearing(t);
       lot={t,x:centerX(t),y:elevation(t),cos:Math.cos(a),sin:Math.sin(a)};
-      shop(side,t,i+(side>0?2:0));
+      seed=1+k*2+(side>0?1:0);
+      shop(side,t,k+(side>0?2:0));
     }
   }
   lot=null;
@@ -327,14 +330,15 @@
   const headingAt=t=>Math.atan((centerX(t+10)-centerX(t))/10);
   const restAngle=headingAt(0), panScale=.12;
   let minAngle=restAngle,maxAngle=restAngle;
-  for(let t=-20;t<=100;t++){minAngle=Math.min(minAngle,headingAt(t));maxAngle=Math.max(maxAngle,headingAt(t));}
+  for(let t=-20;t<=PERIOD+20;t++){minAngle=Math.min(minAngle,headingAt(t));maxAngle=Math.max(maxAngle,headingAt(t));}
   const city=canvas.parentElement, backdrop=city.querySelector('.skyline');
   function draw(now){
     frame=0;
     if(document.hidden||gl.isContextLost())return;
     const dt=Math.min(.06,(now-previous)/1000);previous=now;
     const moving=!document.body.classList.contains('paused');
-    if(moving){elapsed+=dt;target=Math.min(100,target+dt*.198);}
+    if(moving){elapsed+=dt;target+=dt*.2178;}
+    if(z>PERIOD){z-=PERIOD;target-=PERIOD;}
     z+=(target-z)*(1-Math.exp(-dt*10));
     const w=canvas.clientWidth,h=canvas.clientHeight,dpr=Math.min(devicePixelRatio,1.5);
     if(canvas.width!==Math.round(w*dpr)||canvas.height!==Math.round(h*dpr)){
@@ -368,7 +372,7 @@
   window.addEventListener('wheel',e=>{
     if(e.ctrlKey||e.defaultPrevented||document.querySelector('dialog[open]')||e.target.closest('#topics.docked #filter-panel')||Math.abs(e.deltaX)>Math.abs(e.deltaY))return;
     const unit=e.deltaMode===1?16:e.deltaMode===2?innerHeight:1;
-    target=Math.max(-20,Math.min(100,target+Math.max(-9,Math.min(9,e.deltaY*unit*.024))));
+    target=Math.max(-20,(target+Math.max(-9,Math.min(9,e.deltaY*unit*.024))));
     requestDraw();
   },{passive:true});
   new ResizeObserver(requestDraw).observe(canvas);

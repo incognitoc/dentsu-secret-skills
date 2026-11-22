@@ -62,8 +62,8 @@ function openBook(article, number) {
   document.querySelector('#summary').textContent = article.summary;
   document.querySelector('#tags').textContent = article.tags.map(tag => '＃' + tag).join('　');
   dialog.querySelector('.read').href = 'pdf/' + number + '.pdf';
-  dialog.showModal();
   const item = books.find(entry => entry.article.id === article.id);
+  openingAnimation(item).then(() => dialog.showModal());
   if (!readBooks.has(article.id)) {
     readBooks.add(article.id);
     try { localStorage.setItem(readKey, JSON.stringify([...readBooks])); } catch {}
@@ -71,6 +71,39 @@ function openBook(article, number) {
     item.book.setAttribute('aria-label', '再次翻閱《' + article.title + '》');
     list.dispatchEvent(new Event('books-change'));
   }
+}
+// A copy of the cover flies to the centre and swings open on its spine before the reader shows.
+let opening = null;
+function openingAnimation(item) {
+  if (opening || reducedMotion.matches || !item || !item.book.animate) return Promise.resolve();
+  const from = item.book.getBoundingClientRect();
+  const width = Math.min(innerWidth * .34, innerHeight * .5 * .69, 300), height = width / .69;
+  const dx = innerWidth / 2 - width / 2 - from.left, dy = innerHeight / 2 - height / 2 - from.top;
+  const scale = from.width / width;
+  const shell = make('div', '', 'book-opening');
+  Object.assign(shell.style, { left: from.left + 'px', top: from.top + 'px', width: width + 'px', height: height + 'px' });
+  const lid = make('div', '', 'lid'), front = make('div', '', 'front');
+  if (item.cover) front.style.backgroundImage = 'url(' + item.cover.toDataURL('image/jpeg', .85) + ')';
+  else front.style.background = item.book.style.getPropertyValue('--cloth');
+  lid.append(front, make('div', '', 'back'));
+  shell.append(make('div', '', 'pages'), lid);
+  document.body.append(shell);
+  const ease = 'cubic-bezier(.2,.7,.25,1)';
+  const fly = shell.animate([
+    { transform: 'translate(0,0) scale(' + scale + ')' },
+    { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(1)' }
+  ], { duration: 200, easing: ease, fill: 'forwards' });
+  const swing = lid.animate([
+    { transform: 'rotateY(0deg)' },
+    { transform: 'rotateY(-165deg)' }
+  ], { duration: 400, delay: 100, easing: ease, fill: 'forwards' });
+  // Hand over to the reader once the cover is half open; the swing finishes under the fade.
+  const halfOpen = new Promise(done => setTimeout(done, 100 + 400 / 2));
+  opening = Promise.all([fly.finished, halfOpen]).then(() => {
+    shell.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 180 }).finished.then(() => shell.remove());
+    opening = null;
+  });
+  return opening;
 }
 document.querySelector('#close').onclick = () => dialog.close();
 dialog.addEventListener('click', event => {
