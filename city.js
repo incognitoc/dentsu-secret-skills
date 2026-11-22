@@ -337,7 +337,7 @@
     if(document.hidden||gl.isContextLost())return;
     const dt=Math.min(.06,(now-previous)/1000);previous=now;
     const moving=!document.body.classList.contains('paused');
-    if(moving){elapsed+=dt;target+=dt*.2614;}
+    if(moving){elapsed+=dt;target+=dt*.3398;}
     if(z>PERIOD){z-=PERIOD;target-=PERIOD;}
     z+=(target-z)*(1-Math.exp(-dt*10));
     const w=canvas.clientWidth,h=canvas.clientHeight,dpr=Math.min(devicePixelRatio,1.5);

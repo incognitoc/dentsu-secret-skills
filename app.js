@@ -200,8 +200,18 @@ function stampCleared(article) {
   const item = books.find(entry => entry.article.id === article.id);
   item.book.classList.add('cleared');
   list.dispatchEvent(new Event('books-change'));
+  updateRank();
 }
 dialog.addEventListener('close', () => { quizLeaf.hidden = true; });
+// Rank by share of books cleared: 0–25%, >25%, >50%, >75%, and all of them.
+const ranks = [[1, '宗師'], [.75, '大師'], [.5, '武師'], [.25, '武者'], [0, '學徒']];
+function updateRank() {
+  const total = articles.length, done = articles.filter(article => clearedBooks.has(article.id)).length;
+  const share = done / total;
+  const [, name] = ranks.find(([floor]) => floor === 1 ? share === 1 : floor === 0 || share > floor);
+  document.querySelector('#rank').textContent = '級別：' + name + ' (' + done + '/' + total + ')';
+}
+updateRank();
 document.querySelector('#close').onclick = () => dialog.close();
 dialog.addEventListener('click', event => {
   if (event.target !== dialog) return;
