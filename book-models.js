@@ -115,6 +115,18 @@
     if(item.article.chapter==='序篇'){g.fillText('序',0,0);g.fillText('篇',0,24);}else{g.rotate(Math.PI/2);g.textAlign='left';g.fillText(item.article.chapter,0,0);}g.restore();
     g.fillStyle='#873e31';g.fillRect(48,374,59,35);g.strokeStyle='#e3bf8b';g.strokeRect(50,376,55,31);
     g.fillStyle='#ffeac7';g.font='19px serif';g.fillText('卷'+String(id).padStart(2,'0'),78,392);
+    if(clearedBooks.has(id)){
+      // 破關 seal pressed onto the cover, slightly uneven like real ink.
+      g.save();g.translate(150,300);g.rotate(-.21);g.globalAlpha=.9;
+      g.fillStyle='#b3382a';g.fillRect(-48,-48,96,96);
+      g.fillStyle='#f1dcc0';g.fillRect(-41,-41,82,82);g.fillStyle='#b3382a';g.fillRect(-37,-37,74,74);
+      g.fillStyle='#f6e6cc';g.textAlign='center';g.textBaseline='middle';
+      g.font='bold 31px "Noto Serif TC","Songti TC","Microsoft JhengHei",serif';
+      g.fillText('破',0,-17);g.fillText('關',0,18);
+      g.globalCompositeOperation='destination-out';
+      for(let i=0;i<70;i++){g.globalAlpha=.25+random()*.5;g.fillRect(-48+random()*96,-48+random()*96,1+random()*3,1+random()*2);}
+      g.restore();
+    }
     return sheet;
   }
 
@@ -124,7 +136,7 @@
     let entry=textures.get(item);
     if(!entry){entry={id:gl.createTexture()};textures.set(item,entry);}
     gl.bindTexture(gl.TEXTURE_2D,entry.id);
-    const aged=readBooks.has(item.article.id);
+    const aged=readBooks.has(item.article.id)+'|'+clearedBooks.has(item.article.id);
     if(entry.aged!==aged){
       item.cover=coverArt(item);
       gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,gl.RGB,gl.UNSIGNED_BYTE,item.cover);

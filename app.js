@@ -62,6 +62,7 @@ function openBook(article, number) {
   document.querySelector('#summary').textContent = article.summary;
   document.querySelector('#tags').textContent = article.tags.map(tag => '＃' + tag).join('　');
   dialog.querySelector('.read').href = 'pdf/' + number + '.pdf';
+  showQuizButton(article);
   const item = books.find(entry => entry.article.id === article.id);
   openingAnimation(item).then(() => dialog.showModal());
   if (!readBooks.has(article.id)) {
@@ -105,6 +106,102 @@ function openingAnimation(item) {
   });
   return opening;
 }
+// 秘笈破關: three single-choice questions; all correct stamps 破關 on the cover.
+const clearedKey = 'dentsu-manual.cleared-2026';
+let clearedBooks;
+try {
+  const ids = JSON.parse(localStorage.getItem(clearedKey) || '[]');
+  clearedBooks = new Set(Array.isArray(ids) ? ids : []);
+} catch { clearedBooks = new Set(); }
+const quizLeaf = document.querySelector('#quiz');
+const quizForm = document.querySelector('#quiz-form');
+const quizList = document.querySelector('#quiz-questions');
+const quizResult = document.querySelector('#quiz-result');
+const quizSubmit = document.querySelector('#quiz-submit');
+const quizOpen = document.querySelector('#quiz-open');
+let quizArticle = null;
+function showQuizButton(article) {
+  quizArticle = article;
+  quizLeaf.hidden = true;
+  const questions = (typeof quizzes !== 'undefined' && quizzes[article.id]) || [];
+  quizOpen.hidden = !questions.length;
+  const cleared = clearedBooks.has(article.id);
+  quizOpen.textContent = cleared ? '已破關・再挑戰' : '秘笈破關';
+  dialog.classList.toggle('cleared', cleared);
+}
+function buildQuiz() {
+  const questions = quizzes[quizArticle.id];
+  quizList.replaceChildren(...questions.map((item, index) => {
+    const li = make('li', '');
+    const fieldset = make('fieldset', '');
+    fieldset.append(make('legend', item.q));
+    item.options.forEach((option, choice) => {
+      const label = make('label', '');
+      const input = document.createElement('input');
+      input.type = 'radio'; input.name = 'q' + index; input.value = choice; input.required = true;
+      label.append(input, make('span', option));
+      fieldset.append(label);
+    });
+    li.append(fieldset);
+    return li;
+  }));
+  quizResult.textContent = '';
+  quizSubmit.textContent = '交卷';
+  quizForm.dataset.state = '';
+}
+quizOpen.onclick = () => {
+  buildQuiz();
+  quizLeaf.hidden = false;
+  if (!reducedMotion.matches) quizLeaf.animate(
+    [{ transform: 'rotateY(178deg)' }, { transform: 'rotateY(0deg)' }],
+    { duration: 650, easing: 'cubic-bezier(.3,.6,.25,1)' });
+  quizList.querySelector('input').focus({ preventScroll: true });
+};
+document.querySelector('#quiz-back').onclick = () => {
+  if (reducedMotion.matches) { quizLeaf.hidden = true; return; }
+  quizLeaf.animate([{ transform: 'rotateY(0deg)' }, { transform: 'rotateY(178deg)' }],
+    { duration: 450, easing: 'ease-in' }).finished.then(() => { quizLeaf.hidden = true; });
+};
+quizForm.addEventListener('submit', event => {
+  event.preventDefault();
+  if (quizForm.dataset.state === 'retry') { buildQuiz(); return; }
+  if (quizForm.dataset.state === 'done') { document.querySelector('#quiz-back').click(); return; }
+  const questions = quizzes[quizArticle.id];
+  let correct = 0;
+  questions.forEach((item, index) => {
+    const fieldset = quizList.children[index].querySelector('fieldset');
+    const picked = Number(new FormData(quizForm).get('q' + index));
+    const right = picked === item.answer;
+    if (right) correct++;
+    fieldset.disabled = true;
+    fieldset.classList.add(right ? 'right' : 'wrong');
+    fieldset.querySelectorAll('label')[item.answer].classList.add('answer');
+  });
+  if (correct === questions.length) {
+    quizResult.textContent = '三題全對，恭喜破關！';
+    quizSubmit.textContent = '收下印章';
+    quizForm.dataset.state = 'done';
+    stampCleared(quizArticle);
+  } else {
+    quizResult.textContent = '答對 ' + correct + ' / ' + questions.length + ' 題，再修煉一下。';
+    quizSubmit.textContent = '再試一次';
+    quizForm.dataset.state = 'retry';
+  }
+});
+function stampCleared(article) {
+  const first = !clearedBooks.has(article.id);
+  clearedBooks.add(article.id);
+  try { localStorage.setItem(clearedKey, JSON.stringify([...clearedBooks])); } catch {}
+  quizOpen.textContent = '已破關・再挑戰';
+  dialog.classList.add('cleared');
+  if (first && !reducedMotion.matches) dialog.querySelector('.clear-seal').animate(
+    [{ transform: 'rotate(-12deg) scale(2.4)', opacity: 0 }, { transform: 'rotate(-12deg) scale(.92)', opacity: 1, offset: .7 },
+     { transform: 'rotate(-12deg) scale(1)', opacity: 1 }], { duration: 520, easing: 'cubic-bezier(.3,.7,.3,1)' });
+  const item = books.find(entry => entry.article.id === article.id);
+  item.book.classList.add('cleared');
+  list.dispatchEvent(new Event('books-change'));
+}
+dialog.addEventListener('close', () => { quizLeaf.hidden = true; });
 document.querySelector('#close').onclick = () => dialog.close();
 dialog.addEventListener('click', event => {
   if (event.target !== dialog) return;
@@ -119,6 +216,7 @@ for (const article of articles) {
   book.style.setProperty('--cloth', color);
   book.setAttribute('aria-label', '翻開《' + article.title + '》');
   book.title = article.title;
+  if (clearedBooks.has(article.id)) book.classList.add('cleared');
   if (readBooks.has(article.id)) {
     book.classList.add('worn');
     book.setAttribute('aria-label', '再次翻閱《' + article.title + '》');

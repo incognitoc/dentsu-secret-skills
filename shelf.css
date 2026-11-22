@@ -189,3 +189,42 @@ header {position:relative;z-index:8}
 .book-opening .lid>div {position:absolute;inset:0;border-radius:2px;backface-visibility:hidden;-webkit-backface-visibility:hidden;box-shadow:0 10px 30px #0006}
 .book-opening .front {background-size:100% 100%}
 .book-opening .back {transform:rotateY(180deg);background:#e8dcbc;box-shadow:inset 0 0 0 1px #b9a77f}
+
+/* 秘笈破關 quiz page: a leaf that turns over the left page from the gutter. */
+.folio-foot {display:flex;align-items:center;justify-content:space-between;gap:10px}
+#reader #quiz-open {padding:5px 12px;margin:0;color:#f6ecd2;background:var(--seal);border:1px solid #5e2a20;border-radius:0;font-size:.95rem}
+#reader #quiz-open:hover {background:#9e4a39}
+#reader {perspective:2200px}
+.quiz-leaf {position:absolute;top:0;bottom:0;left:0;width:50%;display:flex;padding:22px 19px 24px;
+  transform-origin:100% 50%;backface-visibility:hidden;-webkit-backface-visibility:hidden;z-index:3;
+  background-color:#e4d5ae;background-image:linear-gradient(90deg,#94794a24,transparent 5%,transparent 91%,#836c3d55),linear-gradient(#f0e6c9d9,#ebdec0d9),url(assets/paper.jpg);
+  background-size:100% 100%,100% 100%,230px auto;box-shadow:6px 0 14px #3b2e1a40}
+.quiz-leaf[hidden] {display:none}
+.quiz-leaf .page-frame {margin:0;min-height:0}
+.quiz-leaf .folio-head small {color:var(--seal);letter-spacing:.06em;font-size:.85rem}
+#quiz-back {padding:3px 9px;margin:0;border:1px solid #6d5a3c;border-radius:0;color:#473d2b;background:transparent;font-size:.85rem}
+#quiz-questions {flex:1;overflow:auto;margin:0;padding:10px 14px 4px 34px;font-size:.93rem;line-height:1.5}
+#quiz-questions li {margin-bottom:10px}
+#quiz-questions li::marker {color:var(--seal);font-weight:700}
+#quiz-questions fieldset {border:0;padding:0;margin:0;min-width:0}
+#quiz-questions legend {padding:0;margin-bottom:4px;font-weight:600}
+#quiz-questions label {display:flex;gap:7px;align-items:flex-start;padding:2px 6px;margin-left:-6px;cursor:pointer;border-radius:2px}
+#quiz-questions label:hover {background:#86683b17}
+#quiz-questions input {accent-color:var(--seal);margin:.3em 0 0}
+#quiz-questions .wrong legend::after {content:'　✗';color:#a3362a}
+#quiz-questions .right legend::after {content:'　✓';color:#3f6b3a}
+#quiz-questions fieldset:disabled label {cursor:default}
+#quiz-questions fieldset:disabled .answer {background:#5d7d4a26;outline:1px solid #5d7d4a80}
+#quiz-result {margin:0;color:var(--seal);font-size:.9rem}
+#reader #quiz-submit {padding:5px 14px;margin:0;color:var(--seal);border:3px double var(--seal);border-radius:0;background:transparent;flex:none}
+
+/* 破關 seal on the title page once the quiz is cleared. */
+.clear-seal {position:absolute;right:9%;bottom:15%;z-index:2;display:none;place-items:center;width:84px;height:84px;
+  border:4px double #a8382a;border-radius:6px;color:#a8382a;font:700 1.6rem/1 "Noto Serif TC","Songti TC",serif;letter-spacing:.06em;
+  writing-mode:vertical-rl;transform:rotate(-12deg);opacity:.88;mix-blend-mode:multiply;pointer-events:none;
+  background:radial-gradient(circle at 30% 70%,transparent 60%,#e4d5ae66 61%)}
+#reader.cleared .clear-seal {display:grid}
+@media(max-width:650px){
+  .quiz-leaf {width:auto;right:0;padding:14px;transform-origin:50% 0}
+  .clear-seal {top:70px;bottom:auto;right:24px;width:68px;height:68px;font-size:1.3rem}
+}
