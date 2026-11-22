@@ -106,7 +106,7 @@ function openingAnimation(item) {
   });
   return opening;
 }
-// 秘笈破關: three single-choice questions; all correct stamps 破關 on the cover.
+// 秘笈測試: three single-choice questions; all correct stamps 破關 on the cover.
 const clearedKey = 'dentsu-manual.cleared-2026';
 let clearedBooks;
 try {
@@ -126,7 +126,7 @@ function showQuizButton(article) {
   const questions = (typeof quizzes !== 'undefined' && quizzes[article.id]) || [];
   quizOpen.hidden = !questions.length;
   const cleared = clearedBooks.has(article.id);
-  quizOpen.textContent = cleared ? '已破關・再挑戰' : '秘笈破關';
+  quizOpen.textContent = cleared ? '已破關・再挑戰' : '秘笈測試';
   dialog.classList.toggle('cleared', cleared);
 }
 function buildQuiz() {

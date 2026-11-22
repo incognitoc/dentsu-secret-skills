@@ -190,10 +190,13 @@ header {position:relative;z-index:8}
 .book-opening .front {background-size:100% 100%}
 .book-opening .back {transform:rotateY(180deg);background:#e8dcbc;box-shadow:inset 0 0 0 1px #b9a77f}
 
-/* 秘笈破關 quiz page: a leaf that turns over the left page from the gutter. */
+/* 秘笈測試 quiz page: a leaf that turns over the left page from the gutter. */
 .folio-foot {display:flex;align-items:center;justify-content:space-between;gap:10px}
-#reader #quiz-open {padding:5px 12px;margin:0;color:#f6ecd2;background:var(--seal);border:1px solid #5e2a20;border-radius:0;font-size:.95rem}
-#reader #quiz-open:hover {background:#9e4a39}
+/* Quiz and PDF buttons share one double-rule style and split the footer evenly. */
+#reader .text-leaf .folio-foot>* {flex:1 1 0;min-width:0;margin:0;padding:5px 12px;text-align:center;font-size:1rem;line-height:1.5;
+  color:var(--seal);border:3px double var(--seal);border-radius:0;background:transparent;font-family:inherit;font-weight:inherit}
+#reader .text-leaf .folio-foot>[hidden] {display:none}
+#reader #quiz-open:hover {background:#86683b14}
 #reader {perspective:2200px}
 .quiz-leaf {position:absolute;top:0;bottom:0;left:0;width:50%;display:flex;padding:22px 19px 24px;
   transform-origin:100% 50%;backface-visibility:hidden;-webkit-backface-visibility:hidden;z-index:3;
